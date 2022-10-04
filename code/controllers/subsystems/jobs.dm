@@ -1,15 +1,18 @@
-var/const/ENG               =(1<<0)
-var/const/SEC               =(1<<1)
-var/const/MED               =(1<<2)
-var/const/SCI               =(1<<3)
-var/const/CIV               =(1<<4)
-var/const/COM               =(1<<5)
-var/const/MSC               =(1<<6)
-var/const/SRV               =(1<<7)
-var/const/SUP               =(1<<8)
-var/const/SPT               =(1<<9)
-var/const/EXP               =(1<<10)
-var/const/ROB               =(1<<11)
+var/const/ENG = FLAG(0)
+var/const/SEC = FLAG(1)
+var/const/MED = FLAG(2)
+var/const/SCI = FLAG(3)
+var/const/CIV = FLAG(4)
+var/const/COM = FLAG(5)
+var/const/MSC = FLAG(6)
+var/const/SRV = FLAG(7)
+var/const/SUP = FLAG(8)
+var/const/SPT = FLAG(9)
+var/const/EXP = FLAG(10)
+var/const/ROB = FLAG(11)
+
+GLOBAL_VAR(antag_code_phrase)
+GLOBAL_VAR(antag_code_response)
 
 SUBSYSTEM_DEF(jobs)
 	name = "Jobs"
@@ -24,6 +27,11 @@ SUBSYSTEM_DEF(jobs)
 	var/list/unassigned_roundstart =   list()
 	var/list/positions_by_department = list()
 	var/list/job_icons =               list()
+
+
+/datum/controller/subsystem/jobs/UpdateStat(time)
+	return
+
 
 /datum/controller/subsystem/jobs/Initialize(timeofday)
 
@@ -93,8 +101,8 @@ SUBSYSTEM_DEF(jobs)
 							LAZYDISTINCTADD(positions_by_department["[GLOB.bitflags[I]]"], job.alt_titles)
 
 	// Set up syndicate phrases.
-	syndicate_code_phrase = generate_code_phrase()
-	syndicate_code_response	= generate_code_phrase()
+	GLOB.antag_code_phrase = generate_code_phrase()
+	GLOB.antag_code_response = generate_code_phrase()
 
 	// Set up AI spawn locations
 	spawn_empty_ai()
@@ -139,11 +147,6 @@ SUBSYSTEM_DEF(jobs)
 	if(SSticker.mode && SSticker.mode.explosion_in_progress)
 		to_chat(joining, "<span class='warning'>The [station_name()] is currently exploding. Joining would go poorly.</span>")
 		return FALSE
-//[INF]
-	if(!job.is_required_roles_filled())
-		to_chat(joining, SPAN_WARNING("For joining as <b>\a [job.title]</b> there should be <b>\a [jointext(job.required_role, ", ")]</b> in crew."))
-		return FALSE
-//[/INF]
 	return TRUE
 
 /datum/controller/subsystem/jobs/proc/check_latejoin_blockers(var/mob/new_player/joining, var/datum/job/job)
@@ -196,7 +199,6 @@ SUBSYSTEM_DEF(jobs)
 			player.mind.assigned_role = rank
 			player.mind.role_alt_title = job.get_alt_title_for(player.client)
 			unassigned_roundstart -= player
-			log_game("Игрок [player.mind.key] вошел в раунд с профессией [rank] ([job.current_positions]/[position_limit])")
 			job.current_positions++
 			return 1
 	return 0
@@ -347,7 +349,7 @@ SUBSYSTEM_DEF(jobs)
 		if(player.client.prefs.alternate_option == BE_ASSISTANT)
 			var/datum/job/ass = DEFAULT_JOB_TYPE
 			if((GLOB.using_map.flags & MAP_HAS_BRANCH) && player.client.prefs.branches[initial(ass.title)])
-				var/datum/mil_branch/branch = mil_branches.get_branch(player.client.prefs.branches[initial(ass.title)])
+				var/datum/mil_branch/branch = GLOB.mil_branches.get_branch(player.client.prefs.branches[initial(ass.title)])
 				ass = branch.assistant_job
 			assign_role(player, initial(ass.title), mode = mode)
 	//For ones returning to lobby
@@ -409,7 +411,6 @@ SUBSYSTEM_DEF(jobs)
 
 				if(!G.slot || G.slot == slot_tie || (G.slot in loadout_taken_slots) || !G.spawn_on_mob(H, H.client.prefs.Gear()[G.display_name]))
 					spawn_in_storage.Add(G)
-
 				else
 					loadout_taken_slots.Add(G.slot)
 
@@ -439,9 +440,9 @@ SUBSYSTEM_DEF(jobs)
 	if(job)
 		if(H.client)
 			if(GLOB.using_map.flags & MAP_HAS_BRANCH)
-				H.char_branch = mil_branches.get_branch(H.client.prefs.branches[rank])
+				H.char_branch = GLOB.mil_branches.get_branch(H.client.prefs.branches[rank])
 			if(GLOB.using_map.flags & MAP_HAS_RANK)
-				H.char_rank = mil_branches.get_rank(H.client.prefs.branches[rank], H.client.prefs.ranks[rank])
+				H.char_rank = GLOB.mil_branches.get_rank(H.client.prefs.branches[rank], H.client.prefs.ranks[rank])
 
 		// Transfers the skill settings for the job to the mob
 		H.skillset.obtain_from_client(job, H.client)
@@ -483,19 +484,9 @@ SUBSYSTEM_DEF(jobs)
 
 	if(!joined_late || job.latejoin_at_spawnpoints)
 		var/obj/S = job.get_roundstart_spawnpoint()
-		/*[ORIGINAL]
-		if(istype(S, /obj/effect/landmark/start) && istype(S.loc, /turf)
+
+		if(istype(S, /obj/effect/landmark/start) && istype(S.loc, /turf))
 			H.forceMove(S.loc)
-		[/ORIGINAL]*/
-		//[INF]
-		var/turf/truf = get_turf(S)
-		if((istype(S, /obj/effect/landmark/start) && isturf(truf)) || isturf(S))
-			H.forceMove(truf)
-			var/obj/structure/bed/b = locate(/obj/structure/bed) in truf
-			if(istype(b) && !joined_late)
-				H.Sleeping(3)
-				b.buckle_mob(H)
-		//[/INF]
 		else
 			var/datum/spawnpoint/spawnpoint = job.get_spawnpoint(H.client)
 			H.forceMove(pick(spawnpoint.turfs))
@@ -512,9 +503,9 @@ SUBSYSTEM_DEF(jobs)
 		var/datum/money_account/department_account = department_accounts[job.department]
 
 		if(department_account)
-			remembered_info += "<b>Номер Аккаунта Вашего департамента:</b> #[department_account.account_number]<br>"
-			remembered_info += "<b>Пин-код:</b> [department_account.remote_access_pin]<br>"
-			remembered_info += "<b>Сумма на счету:</b> [GLOB.using_map.local_currency_name_short][department_account.money]<br>"
+			remembered_info += "<b>Your department's account number is:</b> #[department_account.account_number]<br>"
+			remembered_info += "<b>Your department's account pin is:</b> [department_account.remote_access_pin]<br>"
+			remembered_info += "<b>Your department's account funds are:</b> [GLOB.using_map.local_currency_name_short][department_account.money]<br>"
 
 		H.StoreMemory(remembered_info, /decl/memory_options/system)
 
@@ -544,30 +535,24 @@ SUBSYSTEM_DEF(jobs)
 			W.buckled_mob = H
 			W.add_fingerprint(H)
 
-	to_chat(H, "<font size = 3><b>Вы - [alt_title ? alt_title : rank].</b></font>")
+	to_chat(H, "<font size = 3><B>You are [job.total_positions == 1 ? "the" : "a"] [alt_title ? alt_title : rank].</B></font>")
 
 	if(job.supervisors)
-		to_chat(H, "<b>Вы подчиняетесь <b>[job.supervisors]</b>. Особые обстоятельства могут изменить это.</b>")
+		to_chat(H, "<b>As the [alt_title ? alt_title : rank] you answer directly to [job.supervisors]. Special circumstances may change this.</b>")
 
-	to_chat(H, "<b>Чтобы общаться на частоте Вашего отдела, используйте префикс \":h\". Для остальных каналов, осмотрите свой наушник.</b>")
+	to_chat(H, "<b>To speak on your department's radio channel use :h. For the use of other channels, examine your headset.</b>")
 
 	if(job.req_admin_notify)
-		to_chat(H, "<b>Ваша профессия особенно важна для игрового прогресса. Если Вам требуется отключиться - пожалуйста, оповестите администрацию.</b>")
+		to_chat(H, "<b>You are playing a job that is important for Game Progression. If you have to disconnect, please notify the admins via adminhelp.</b>")
 
-	//Gives glasses to the vision impaired
-	if(H.disabilities & NEARSIGHTED)
-		var/equipped = H.equip_to_slot_or_del(new /obj/item/clothing/glasses/prescription(H), slot_glasses)
-		if(equipped)
-			var/obj/item/clothing/glasses/G = H.glasses
-			G.prescription = 7
+	if (H.disabilities & NEARSIGHTED) //Try to give glasses to the vision impaired
+		H.equip_to_slot_or_del(new /obj/item/clothing/glasses/prescription(H), slot_glasses)
 
-	BITSET(H.hud_updateflag, ID_HUD)
-	BITSET(H.hud_updateflag, IMPLOYAL_HUD)
-	BITSET(H.hud_updateflag, SPECIALROLE_HUD)
+	SET_BIT(H.hud_updateflag, ID_HUD)
+	SET_BIT(H.hud_updateflag, IMPLOYAL_HUD)
+	SET_BIT(H.hud_updateflag, SPECIALROLE_HUD)
 
 	job.post_equip_rank(H, alt_title || rank)
-
-	INVOKE_ASYNC(GLOBAL_PROC, .proc/show_location_blurb, H.client, 30)
 
 	return H
 
@@ -582,33 +567,3 @@ SUBSYSTEM_DEF(jobs)
 			continue
 		empty_playable_ai_cores += new /obj/structure/AIcore/deactivated(get_turf(S))
 	return 1
-
-/proc/show_location_blurb(client/C, duration)
-	set waitfor = 0
-
-	var/style = "font-family: 'Fixedsys'; -dm-text-outline: 1 black; font-size: 9px;"
-	var/area/A = get_area(C.mob)
-	var/text = "[stationdate2text()], [stationtime2text()]\n[station_name()], [A.name]"
-	text = uppertext(text)
-
-	var/obj/effect/overlay/T = new()
-	T.maptext_height = 64
-	T.maptext_width = 512
-	T.layer = FLOAT_LAYER
-	T.plane = HUD_PLANE
-	T.appearance_flags = APPEARANCE_UI_IGNORE_ALPHA
-	T.screen_loc = "LEFT+1,BOTTOM+2"
-
-	C.screen += T
-	animate(T, alpha = 255, time = 10)
-	for(var/i = 1 to length(text)+1)
-		T.maptext = "<span style=\"[style]\">[copytext(text,1,i)] </span>"
-		sleep(1)
-
-	addtimer(CALLBACK(GLOBAL_PROC, .proc/fade_location_blurb, C, T), duration)
-
-/proc/fade_location_blurb(client/C, obj/T)
-	animate(T, alpha = 0, time = 5)
-	sleep(5)
-	C.screen -= T
-	qdel(T)
