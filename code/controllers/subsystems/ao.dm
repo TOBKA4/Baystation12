@@ -1,4 +1,4 @@
-SUBSYSTEM_DEF(ao)
+SSUBSYSTEM_DEF(ao)
 	name = "Ambient Occlusion"
 	init_order = SS_INIT_MISC_LATE
 	wait = 1
@@ -6,6 +6,13 @@ SUBSYSTEM_DEF(ao)
 	flags = SS_NO_INIT
 	var/static/tmp/list/queue = list()
 	var/static/tmp/list/cache = list()
+
+
+/datum/controller/subsystem/ao/UpdateStat(time)
+	if (PreventUpdateStat(time))
+		return ..()
+	..("Queue: [queue.len]")
+
 
 /datum/controller/subsystem/ao/fire(resume, no_mc_tick)
 	if (!resume)
