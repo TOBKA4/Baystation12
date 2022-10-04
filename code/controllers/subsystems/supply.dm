@@ -31,6 +31,38 @@ SUBSYSTEM_DEF(supply)
 	)
 
 /datum/controller/subsystem/supply/Initialize()
+	. = ..()SUBSYSTEM_DEF(supply)
+	name = "Supply"
+	wait = 20 SECONDS
+	priority = SS_PRIORITY_SUPPLY
+	//Initializes at default time
+	flags = SS_NO_TICK_CHECK
+
+	//supply points
+	var/points = 50
+	var/points_per_process = 1
+	var/points_per_slip = 2
+	var/point_sources = list()
+	var/pointstotalsum = 0
+	var/pointstotal = 0
+	//control
+	var/ordernum
+	var/list/shoppinglist = list()
+	var/list/requestlist = list()
+	var/list/donelist = list()
+	var/list/master_supply_list = list()
+	//shuttle movement
+	var/movetime = 1200
+	var/datum/shuttle/autodock/ferry/supply/shuttle
+	var/list/point_source_descriptions = list(
+		"time" = "Base station supply",
+		"manifest" = "From exported manifests",
+		"crate" = "From exported crates",
+		"gep" = "From uploaded good explorer points",
+		"total" = "Total" // If you're adding additional point sources, add it here in a new line. Don't forget to put a comma after the old last line.
+	)
+
+/datum/controller/subsystem/supply/Initialize()
 	. = ..()
 	ordernum = rand(1,9000)
 
@@ -50,8 +82,12 @@ SUBSYSTEM_DEF(supply)
 /datum/controller/subsystem/supply/fire()
 	add_points_from_source(points_per_process, "time")
 
-/datum/controller/subsystem/supply/stat_entry()
+
+/datum/controller/subsystem/supply/UpdateStat(time)
+	if (PreventUpdateStat(time))
+		return ..()
 	..("Points: [points]")
+
 
 //Supply-related helper procs.
 
@@ -68,7 +104,7 @@ SUBSYSTEM_DEF(supply)
 		return 1
 	if(istype(A,/obj/machinery/nuclearbomb))
 		return 1
-	if(istype(A,/obj/item/device/radio/beacon))
+	if(istype(A,/obj/machinery/tele_beacon))
 		return 1
 
 	for(var/i=1, i<=A.contents.len, i++)
