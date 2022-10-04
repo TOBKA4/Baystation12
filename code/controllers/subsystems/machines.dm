@@ -1,7 +1,8 @@
-#define SSMACHINES_PIPENETS      1
-#define SSMACHINES_MACHINERY     2
-#define SSMACHINES_POWERNETS     3
+#define SSMACHINES_PIPENETS 1
+#define SSMACHINES_MACHINERY 2
+#define SSMACHINES_POWERNETS 3
 #define SSMACHINES_POWER_OBJECTS 4
+
 
 #define START_PROCESSING_IN_LIST(Datum, List) \
 if (Datum.is_processing) {\
@@ -32,12 +33,12 @@ if(Datum.is_processing) {\
 #define START_PROCESSING_POWER_OBJECT(Datum) START_PROCESSING_IN_LIST(Datum, power_objects)
 #define STOP_PROCESSING_POWER_OBJECT(Datum) STOP_PROCESSING_IN_LIST(Datum, power_objects)
 
+
 SUBSYSTEM_DEF(machines)
 	name = "Machines"
 	init_order = SS_INIT_MACHINES
 	priority = SS_PRIORITY_MACHINERY
 	flags = SS_KEEP_TIMING
-
 	runlevels = RUNLEVEL_GAME | RUNLEVEL_POSTGAME
 	var/static/tmp/current_step = SSMACHINES_PIPENETS
 	var/static/tmp/cost_pipenets = 0
@@ -51,6 +52,7 @@ SUBSYSTEM_DEF(machines)
 	var/static/tmp/list/processing = list()
 	var/static/tmp/list/queue = list()
 
+
 /datum/controller/subsystem/machines/Recover()
 	current_step = SSMACHINES_PIPENETS
 	queue.Cut()
@@ -60,6 +62,7 @@ SUBSYSTEM_DEF(machines)
 	makepowernets()
 	setup_atmos_machinery(machinery)
 	fire()
+
 
 /datum/controller/subsystem/machines/fire(resumed, no_mc_tick)
 	var/timer
@@ -101,7 +104,8 @@ SUBSYSTEM_DEF(machines)
 	for(var/datum/powernet/powernet as anything in powernets)
 		qdel(powernet)
 	powernets.Cut()
-	setup_powernets_for_cables(cable_list)
+	setup_powernets_for_cables(GLOB.cable_list)
+
 
 /datum/controller/subsystem/machines/proc/setup_powernets_for_cables(list/cables)
 	for (var/obj/structure/cable/cable as anything in cables)
@@ -111,36 +115,39 @@ SUBSYSTEM_DEF(machines)
 		network.add_cable(cable)
 		propagate_network(cable, cable.powernet)
 
+
 /datum/controller/subsystem/machines/proc/setup_atmos_machinery(list/machines)
 	set background = TRUE
 	var/list/atmos_machines = list()
 	for (var/obj/machinery/atmospherics/machine in machines)
 		atmos_machines += machine
-
 	report_progress("Initializing atmos machinery")
 	for (var/obj/machinery/atmospherics/machine as anything in atmos_machines)
 		machine.atmos_init()
 		CHECK_TICK
-
 	report_progress("Initializing pipe networks")
 	for (var/obj/machinery/atmospherics/machine as anything in atmos_machines)
 		machine.build_network()
 		CHECK_TICK
 
-/datum/controller/subsystem/machines/stat_entry()
-	var/msg = list()
-	msg += "C:{"
-	msg += "PI:[round(cost_pipenets,1)]|"
-	msg += "MC:[round(cost_machinery,1)]|"
-	msg += "PN:[round(cost_powernets,1)]|"
-	msg += "PO:[round(cost_power_objects,1)]"
-	msg += "} "
-	msg += "PI:[pipenets.len]|"
-	msg += "MC:[processing.len]|"
-	msg += "PN:[powernets.len]|"
-	msg += "PO:[power_objects.len]|"
-	msg += "MC/MS:[round((cost ? processing.len/cost : 0),0.1)]"
-	..(jointext(msg, null))
+
+/datum/controller/subsystem/machines/UpdateStat(time)
+	if (PreventUpdateStat(time))
+		return ..()
+	..({"\
+		Queues: \
+		Pipes [pipenets.len] \
+		Machines [processing.len] \
+		Networks [powernets.len] \
+		Objects [power_objects.len]\n\
+		Costs: \
+		Pipes [Round(cost_pipenets)] \
+		Machines [Round(cost_machinery)] \
+		Networks [Round(cost_powernets)] \
+		Objects [Round(cost_power_objects)]\n\
+		Overall [Roundm(cost ? processing.len / cost : 0, 0.1)]
+	"})
+
 
 /datum/controller/subsystem/machines/proc/process_pipenets(resumed, no_mc_tick)
 	if (!resumed)
@@ -180,6 +187,7 @@ SUBSYSTEM_DEF(machines)
 			queue.Cut(i)
 			return
 
+
 /datum/controller/subsystem/machines/proc/process_powernets(resumed, no_mc_tick)
 	if (!resumed)
 		queue = powernets.Copy()
@@ -197,6 +205,7 @@ SUBSYSTEM_DEF(machines)
 		else if (MC_TICK_CHECK)
 			queue.Cut(i)
 			return
+
 
 /datum/controller/subsystem/machines/proc/process_power_objects(resumed, no_mc_tick)
 	if (!resumed)
