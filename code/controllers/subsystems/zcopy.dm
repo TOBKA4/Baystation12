@@ -81,8 +81,21 @@ SUBSYSTEM_DEF(zcopy)
 
 	enable()
 
-/datum/controller/subsystem/zcopy/stat_entry()
-	..("Mx:[json_encode(zlev_maximums)]\n\tQ:{T:[queued_turfs.len - (qt_idex - 1)]|O:[queued_overlays.len - (qo_idex - 1)]}\n\tT:{T:[openspace_turfs]|O:[openspace_overlays]}\n\tSk:{T:[multiqueue_skips_turf]|O:[multiqueue_skips_object]}")
+/datum/controller/subsystem/zcopy/UpdateStat(time)
+	if (PreventUpdateStat(time))
+		return ..()
+	..({"\
+		Mx: [json_encode(zlev_maximums)]\n\
+		Queues: \
+		Turfs [queued_turfs.len - (qt_idex - 1)] \
+		Overlays [queued_overlays.len - (qo_idex - 1)]\n\
+		Open Turfs: \
+		Turfs [openspace_turfs] \
+		Overlays [openspace_overlays]\n\
+		Skips: \
+		Turfs [multiqueue_skips_turf] \
+		Objects [multiqueue_skips_object]\
+	"})
 
 /datum/controller/subsystem/zcopy/Initialize(timeofday)
 	calculate_zstack_limits()
@@ -376,7 +389,7 @@ SUBSYSTEM_DEF(zcopy)
 		"<h1>Analysis of [T] at [T.x],[T.y],[T.z]</h1>",
 		"<b>Queue occurrences:</b> [T.z_queued]",
 		"<b>Above space:</b> Apparent [T.z_eventually_space ? "Yes" : "No"], Actual [is_above_space ? "Yes" : "No"] - [T.z_eventually_space == is_above_space ? "<font color='green'>OK</font>" : "<font color='red'>MISMATCH</font>"]",
-		"<b>Z Flags</b>: [english_list(bitfield2list(T.z_flags, global.mimic_defines), "(none)")]",
+		"<b>Z Flags</b>: [english_list(bitfield2list(T.z_flags, GLOB.mimic_defines), "(none)")]",
 		"<b>Has Shadower:</b> [T.shadower ? "Yes" : "No"]",
 		"<b>Has turf proxy:</b> [T.mimic_proxy ? "Yes" : "No"]",
 		"<b>Has above copy:</b> [T.mimic_above_copy ? "Yes" : "No"]",
