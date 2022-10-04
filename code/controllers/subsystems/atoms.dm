@@ -3,6 +3,7 @@
 #define BAD_INIT_SLEPT 4
 #define BAD_INIT_NO_HINT 8
 
+
 SUBSYSTEM_DEF(atoms)
 	name = "Atoms"
 	init_order = SS_INIT_ATOMS
@@ -14,8 +15,11 @@ SUBSYSTEM_DEF(atoms)
 	var/static/tmp/list/created_atoms = list()
 	var/static/tmp/list/BadInitializeCalls = list()
 
-/datum/controller/subsystem/atoms/stat_entry(msg)
-	..("[msg] [BadInitializeCalls.len] bad inits")
+
+/datum/controller/subsystem/atoms/UpdateStat(time)
+	if (PreventUpdateStat(time))
+		return ..()
+	..("Bad Inits: [BadInitializeCalls.len]")
 
 
 /datum/controller/subsystem/atoms/Shutdown()
@@ -23,15 +27,18 @@ SUBSYSTEM_DEF(atoms)
 	if (initlog)
 		text2file(initlog, "[GLOB.log_directory]/initialize.log")
 
+
 /datum/controller/subsystem/atoms/Initialize(timeofday)
 	atom_init_stage = INITIALIZATION_INNEW_MAPLOAD
 	InitializeAtoms()
+
 
 /datum/controller/subsystem/atoms/Recover()
 	created_atoms.Cut()
 	late_loaders.Cut()
 	if (atom_init_stage == INITIALIZATION_INNEW_MAPLOAD)
 		InitializeAtoms()
+
 
 /datum/controller/subsystem/atoms/proc/InitializeAtoms()
 	if (atom_init_stage <= INITIALIZATION_INSSATOMS_LATE)
@@ -54,9 +61,7 @@ SUBSYSTEM_DEF(atoms)
 				InitAtom(A, mapload_arg)
 				++count
 				CHECK_TICK
-
 	report_progress("Initialized [count] atom\s")
-
 	atom_init_stage = INITIALIZATION_INNEW_REGULAR
 	if (!late_loaders.len)
 		return
@@ -75,9 +80,7 @@ SUBSYSTEM_DEF(atoms)
 	var/result = A.Initialize(arglist(arguments))
 	if(start_tick != world.time)
 		BadInitializeCalls[atom_type] |= BAD_INIT_SLEPT
-
 	var/qdeleted = FALSE
-
 	if (result != INITIALIZE_HINT_NORMAL)
 		switch(result)
 			if (INITIALIZE_HINT_LATELOAD)
@@ -94,35 +97,30 @@ SUBSYSTEM_DEF(atoms)
 		qdeleted = TRUE
 	else if (!(A.atom_flags & ATOM_FLAG_INITIALIZED))
 		BadInitializeCalls[atom_type] |= BAD_INIT_DIDNT_INIT
-
 	return qdeleted || QDELING(A)
+
 
 /datum/controller/subsystem/atoms/proc/map_loader_begin()
 	old_init_stage = atom_init_stage
 	atom_init_stage = INITIALIZATION_INSSATOMS_LATE
 
+
 /datum/controller/subsystem/atoms/proc/map_loader_stop()
 	atom_init_stage = old_init_stage
 
-/datum/controller/subsystem/atoms/Recover()
-	atom_init_stage = SSatoms.atom_init_stage
-	if(atom_init_stage == INITIALIZATION_INNEW_MAPLOAD)
-		InitializeAtoms()
-	old_init_stage = SSatoms.old_init_stage
-	BadInitializeCalls = SSatoms.BadInitializeCalls
 
 /datum/controller/subsystem/atoms/proc/InitLog()
 	. = ""
-	for(var/path in BadInitializeCalls)
+	for (var/path in BadInitializeCalls)
 		. += "Path : [path] \n"
 		var/fails = BadInitializeCalls[path]
-		if(fails & BAD_INIT_DIDNT_INIT)
+		if (fails & BAD_INIT_DIDNT_INIT)
 			. += "- Didn't call atom/Initialize()\n"
-		if(fails & BAD_INIT_NO_HINT)
+		if (fails & BAD_INIT_NO_HINT)
 			. += "- Didn't return an Initialize hint\n"
-		if(fails & BAD_INIT_QDEL_BEFORE)
+		if (fails & BAD_INIT_QDEL_BEFORE)
 			. += "- Qdel'd in New()\n"
-		if(fails & BAD_INIT_SLEPT)
+		if (fails & BAD_INIT_SLEPT)
 			. += "- Slept during Initialize()\n"
 
 
