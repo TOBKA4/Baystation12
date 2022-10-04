@@ -256,6 +256,8 @@
 #include "code\controllers\subsystems\initialization\fabrication.dm"
 #include "code\controllers\subsystems\initialization\materials.dm"
 #include "code\controllers\subsystems\initialization\misc.dm"
+#include "code\controllers\subsystems\initialization\misc_early.dm"
+#include "code\controllers\subsystems\initialization\misc_late.dm"
 #include "code\controllers\subsystems\initialization\persistence.dm"
 #include "code\controllers\subsystems\initialization\robots.dm"
 #include "code\controllers\subsystems\initialization\webhooks.dm"
