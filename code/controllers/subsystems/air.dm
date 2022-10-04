@@ -87,9 +87,6 @@ SUBSYSTEM_DEF(air)
 	var/active_zones = 0
 	var/next_id = 1
 
-	var/active_edges_firelimit = 20
-	var/times_failed_to_calc_firelevel = 0
-
 /datum/controller/subsystem/air/proc/reboot()
 	// Stop processing while we rebuild.
 	can_fire = FALSE
@@ -120,15 +117,18 @@ SUBSYSTEM_DEF(air)
 	next_fire = world.time + wait
 	can_fire = TRUE
 
-/datum/controller/subsystem/air/stat_entry()
-	var/list/out = list(
-		"TtU:[tiles_to_update.len] ",
-		"ZtU:[zones_to_update.len] ",
-		"AFZ:[active_fire_zones.len] ",
-		"AH:[active_hotspots.len] ",
-		"AE:[active_edges.len]"
-	)
-	..(out.Join())
+
+/datum/controller/subsystem/air/UpdateStat(time)
+	if (PreventUpdateStat(time))
+		return ..()
+	..({"\
+		TtU: [tiles_to_update.len] \
+		ZtU: [zones_to_update.len] \
+		AFZ: [active_fire_zones.len] \
+		AH: [active_hotspots.len] \
+		AE: [active_edges.len]\
+	"})
+
 
 /datum/controller/subsystem/air/Initialize(timeofday, simulate = TRUE)
 
@@ -201,7 +201,7 @@ Total Unsimulated Turfs: [world.maxx*world.maxy*world.maxz - simulated_turf_coun
 		T.post_update_air_properties()
 		T.needs_air_update = 0
 		#ifdef ZASDBG
-		T.cut_overlay(mark, TRUE)
+		T.overlays -= mark
 		updated++
 		#endif
 
@@ -218,7 +218,7 @@ Total Unsimulated Turfs: [world.maxx*world.maxy*world.maxz - simulated_turf_coun
 		T.post_update_air_properties()
 		T.needs_air_update = 0
 		#ifdef ZASDBG
-		T.cut_overlay(mark, TRUE)
+		T.overlays -= mark
 		updated++
 		#endif
 
@@ -245,25 +245,9 @@ Total Unsimulated Turfs: [world.maxx*world.maxy*world.maxz - simulated_turf_coun
 		else if (MC_TICK_CHECK)
 			return
 
-	var/halt_firelevel_calculations = 0
-	if(tick_usage * world.tick_lag > Master.current_ticklimit || length(processing_edges) > active_edges_firelimit)
-		halt_firelevel_calculations = 1
-		times_failed_to_calc_firelevel++
-		if(times_failed_to_calc_firelevel > 60)
-			active_edges_firelimit += 5
-			times_failed_to_calc_firelevel = 0
-	else
-		times_failed_to_calc_firelevel = 0
-
 	while (curr_fire.len)
 		var/zone/Z = curr_fire[curr_fire.len]
 		curr_fire.len--
-
-		if(halt_firelevel_calculations)
-			if(length(Z.fire_tiles) && !Z.firelevel)
-				Z.firelevel = vsc.fire_firelevel_multiplier
-		else
-			Z.calculate_fire_level()
 
 		Z.process_fire()
 
@@ -383,7 +367,7 @@ Total Unsimulated Turfs: [world.maxx*world.maxy*world.maxz - simulated_turf_coun
 		return
 	tiles_to_update += T
 	#ifdef ZASDBG
-	T.add_overlay(mark, TRUE)
+	T.overlays += mark
 	#endif
 	T.needs_air_update = 1
 
