@@ -67,7 +67,7 @@ SUBSYSTEM_DEF(shuttle)
 	sectors_to_initialize = null
 
 /datum/controller/subsystem/shuttle/proc/register_landmark(shuttle_landmark_tag, obj/effect/shuttle_landmark/shuttle_landmark)
-	if (registered_shuttle_landmarks[shuttle_landmark_tag] && shuttle_landmark.type != /obj/effect/shuttle_landmark/ship) //TODO-INF: Костыль.
+	if (registered_shuttle_landmarks[shuttle_landmark_tag])
 		CRASH("Attempted to register shuttle landmark with tag [shuttle_landmark_tag], but it is already registered!")
 	if (istype(shuttle_landmark))
 		registered_shuttle_landmarks[shuttle_landmark_tag] = shuttle_landmark
@@ -92,7 +92,7 @@ SUBSYSTEM_DEF(shuttle)
 	for(var/landmark_tag in given_sector.initial_generic_waypoints)
 		if(!try_add_landmark_tag(landmark_tag, given_sector))
 			landmarks_still_needed[landmark_tag] = given_sector
-	
+
 	for(var/shuttle_name in given_sector.initial_restricted_waypoints)
 		for(var/landmark_tag in given_sector.initial_restricted_waypoints[shuttle_name])
 			if(!try_add_landmark_tag(landmark_tag, given_sector))
@@ -155,5 +155,7 @@ SUBSYSTEM_DEF(shuttle)
 			return ship
 	return null
 
-/datum/controller/subsystem/shuttle/stat_entry()
-	..("Shuttles:[shuttles.len], Ships:[ships.len], L:[registered_shuttle_landmarks.len][overmap_halted ? ", HALT" : ""]")
+/datum/controller/subsystem/shuttle/UpdateStat(time)
+	if (PreventUpdateStat(time))
+		return ..()
+	..("Shuttles [shuttles.len] Ships [ships.len] Landmarks [registered_shuttle_landmarks.len] Halted [overmap_halted ? "Y" : "N"]")
