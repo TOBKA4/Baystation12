@@ -1,4 +1,3 @@
-
 SUBSYSTEM_DEF(alarm)
 	name = "Alarm"
 	wait = 2 SECONDS
@@ -8,6 +7,7 @@ SUBSYSTEM_DEF(alarm)
 	var/static/tmp/list/current = list()
 	var/static/tmp/list/active = list()
 
+
 /datum/controller/subsystem/alarm/Initialize(timeofday)
 	handlers = list(
 		GLOB.atmosphere_alarm,
@@ -16,6 +16,12 @@ SUBSYSTEM_DEF(alarm)
 		GLOB.motion_alarm,
 		GLOB.power_alarm
 	)
+
+
+/datum/controller/subsystem/alarm/UpdateStat(time)
+	if (PreventUpdateStat(time))
+		return ..()
+	..("Alarms: [active.len]")
 
 
 /datum/controller/subsystem/alarm/fire(resumed, no_mc_tick)
@@ -31,6 +37,7 @@ SUBSYSTEM_DEF(alarm)
 			current.Cut(i)
 			return
 	current.Cut()
+
 
 GLOBAL_DATUM_INIT(atmosphere_alarm, /datum/alarm_handler/atmosphere, new)
 GLOBAL_DATUM_INIT(camera_alarm, /datum/alarm_handler/camera, new)
