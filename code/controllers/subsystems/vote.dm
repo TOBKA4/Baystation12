@@ -45,8 +45,10 @@ SUBSYSTEM_DEF(vote)
 			for(var/client/C in voting)
 				show_panel(C.mob)
 
-/datum/controller/subsystem/vote/stat_entry()
-	..("Vote:[active_vote ? "[active_vote.name], [active_vote.time_remaining]" : "none"]")
+/datum/controller/subsystem/vote/UpdateStat(time)
+	if (PreventUpdateStat(time))
+		return ..()
+	..("Vote: [active_vote ? "[active_vote.name], [active_vote.time_remaining]" : "None"]")
 
 /datum/controller/subsystem/vote/Recover()
 	last_started_time = SSvote.last_started_time
@@ -75,9 +77,6 @@ SUBSYSTEM_DEF(vote)
 	var/datum/vote/new_vote = new vote_type
 	if(!new_vote.setup(creator, automatic))
 		return FALSE
-	if(new_vote.startshow)
-		for(var/mob/M in GLOB.player_list)
-			show_panel(M)
 
 	active_vote = new_vote
 	last_started_time = world.time
@@ -90,7 +89,7 @@ SUBSYSTEM_DEF(vote)
 	voting |= C
 
 	. = list()
-	. += "<html><meta charset=\"UTF-8\"<title>Voting Panel</title></meta><body>"
+	. += "<html><head><title>Voting Panel</title></head><body>"
 	if(active_vote)
 		. += active_vote.interface(C.mob)
 		if(admin)
@@ -120,16 +119,11 @@ SUBSYSTEM_DEF(vote)
 	if(active_vote)
 		win_x = active_vote.win_x
 		win_y = active_vote.win_y
-//	show_browser(user, interface(user.client),"window=vote;size=[win_x]x[win_y]")
-//	onclose(user, "vote", src)
-
-	var/datum/browser/popup = new(user, "vote", "Voting Panel", win_x, win_y)
-	popup.set_content(interface(user.client))
-	popup.open(use_onclose = TRUE)
+	show_browser(user, interface(user.client),"window=vote;size=[win_x]x[win_y]")
 	onclose(user, "vote", src)
 
 /datum/controller/subsystem/vote/proc/close_panel(mob/user)
-	close_browser(user, "window=vote")
+	show_browser(user, null, "window=vote")
 	if(user)
 		voting -= user.client
 
@@ -174,7 +168,6 @@ SUBSYSTEM_DEF(vote)
 	set waitfor = FALSE
 
 	to_world("World restarting due to vote...")
-	SSstatistics.set_field_details("end_error","restart vote")
 	sleep(50)
 	log_game("Rebooting due to restart vote")
 	world.Reboot()
