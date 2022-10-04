@@ -42,5 +42,3 @@ SUBSYSTEM_DEF(ai)
 #else
 /datum/controller/subsystem/ai/flags = SS_NO_INIT
 #endif
-		if(MC_TICK_CHECK)
-			return
