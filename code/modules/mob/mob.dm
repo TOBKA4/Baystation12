@@ -1,5 +1,5 @@
 /mob/Destroy()//This makes sure that mobs with clients/keys are not just deleted from the game.
-	STOP_PROCESSING(SSmobs, src)
+	STOP_PROCESSING_MOB(src)
 	GLOB.dead_mob_list_ -= src
 	GLOB.living_mob_list_ -= src
 	GLOB.player_list -= src
@@ -52,8 +52,9 @@
 		move_intent = move_intents[1]
 	if(ispath(move_intent))
 		move_intent = decls_repository.get_decl(move_intent)
-	set_focus(src)
-	START_PROCESSING(SSmobs, src)
+	if (!isliving(src))
+		status_flags |= NOTARGET
+	START_PROCESSING_MOB(src)
 
 /mob/proc/show_message(msg, type, alt, alt_type)//Message, type of message (1 or 2), alternative message, alt message type (1 or 2)
 	if(!client)	return
@@ -189,11 +190,6 @@
 /atom/proc/drain_power(var/drain_check,var/surge, var/amount = 0)
 	return -1
 
-/mob/proc/findname(msg)
-	for(var/mob/M in SSmobs.mob_list)
-		if (M.real_name == msg)
-			return M
-	return 0
 
 /mob/proc/movement_delay()
 	. = 0
@@ -214,8 +210,7 @@
 	if(pulling)
 		if(istype(pulling, /obj))
 			var/obj/O = pulling
-			. += O.get_additional_speed_decrease()
-
+			. += clamp(O.w_class, 0, ITEM_SIZE_GARGANTUAN) / 5
 		else if(istype(pulling, /mob))
 			var/mob/M = pulling
 			. += max(0, M.mob_size) / MOB_MEDIUM
@@ -228,7 +223,6 @@
 	return log(2, mob_size / MOB_MEDIUM)
 
 /mob/proc/Life()
-	set waitfor = FALSE
 //	if(organStructure)
 //		organStructure.ProcessOrgans()
 	return
@@ -359,10 +353,6 @@
 
 	var/obj/P = new /obj/effect/decal/point(tile)
 	P.set_invisibility(invisibility)
-	P.pixel_x = A.pixel_x
-	P.pixel_y = A.pixel_y
-	QDEL_IN(P, 2 SECONDS)
-
 	face_atom(A)
 	return 1
 
@@ -422,7 +412,7 @@
 			return "<span class='notice'>[copytext_preserve_html(msg, 1, 37)]... <a href='byond://?src=\ref[src];flavor_more=1'>More...</a></span>"
 
 /client/verb/changes()
-	set name = "Baystation12 Changelog"
+	set name = "Changelog"
 	set category = "OOC"
 	getFiles(
 		'html/88x31.png',
@@ -446,8 +436,8 @@
 		'html/changelog.html'
 		)
 	show_browser(src, 'html/changelog.html', "window=changes;size=675x650")
-	if (SSmisc.changelog_hash && prefs.lastchangelog != SSmisc.changelog_hash)
-		prefs.lastchangelog = SSmisc.changelog_hash
+	if (GLOB.changelog_hash && prefs.lastchangelog != GLOB.changelog_hash)
+		prefs.lastchangelog = GLOB.changelog_hash
 		SScharacter_setup.queue_preferences_save(prefs)
 		winset(src, "rpane.changelog", "background-color=none;font-style=;")
 
@@ -466,7 +456,7 @@
 		if(href_list["mach_close"])
 			var/t1 = text("window=[href_list["mach_close"]]")
 			unset_machine()
-			close_browser(src, t1)
+			show_browser(src, null, t1)
 			return TOPIC_HANDLED
 		if(href_list["flavor_change"])
 			update_flavor_text(href_list["flavor_change"])
@@ -475,7 +465,7 @@
 // If usr != src, or if usr == src but the Topic call was not resolved, this is called next.
 /mob/OnTopic(mob/user, href_list, datum/topic_state/state)
 	if(href_list["flavor_more"])
-		var/text = "<HTML><meta charset=\"UTF-8\"><HEAD><TITLE>[name]</TITLE></HEAD><BODY><TT>[replacetext(flavor_text, "\n", "<BR>")]</TT></BODY></HTML>"
+		var/text = "<HTML><HEAD><TITLE>[name]</TITLE></HEAD><BODY><TT>[replacetext(flavor_text, "\n", "<BR>")]</TT></BODY></HTML>"
 		show_browser(user, text, "window=[name];size=500x200")
 		onclose(user, "[name]")
 		return TOPIC_HANDLED
@@ -653,8 +643,8 @@
 
 /mob/Stat()
 	..()
-	. = (is_client_active(10 MINUTES))
-	if(!.)
+	. = (is_client_active(5 MINUTES))
+	if (!.)
 		return
 
 	if(statpanel("Status"))
@@ -662,18 +652,6 @@
 			stat("Local Time", stationtime2text())
 			stat("Local Date", stationdate2text())
 			stat("Round Duration", roundduration2text())
-//[INF]
-			if(game_id)
-				stat("Round ID:", game_id)
-			var/server_status_info
-			if(SSticker.update_server)
-				server_status_info = "Server Update"
-			else if(SSticker.scheduled_map_change)
-				server_status_info = "Map Change"
-			if(server_status_info)
-				stat("Round End type:", server_status_info)
-//[/INF]
-			stat("Server Time", time2text(world.realtime, "YYYY-MM-DD hh:mm"))
 		if(client.holder || isghost(client.mob))
 			stat("Location:", "([x], [y], [z]) [loc]")
 
@@ -682,20 +660,24 @@
 			stat("CPU:","[world.cpu]")
 			stat("Instances:","[world.contents.len]")
 			stat(null)
+			var/time = REALTIMEOFDAY
 			if(Master)
-				Master.stat_entry()
+				Master.UpdateStat(time)
 			else
 				stat("Master Controller:", "ERROR")
 			if(Failsafe)
-				Failsafe.stat_entry()
+				Failsafe.UpdateStat(time)
 			else if (Master.initializing)
 				stat("Failsafe Controller:", "Waiting for MC")
 			else
 				stat("Failsafe Controller:", "ERROR")
 			if(Master)
 				stat(null)
-				for(var/datum/controller/subsystem/SS in Master.subsystems)
-					SS.stat_entry()
+				config.UpdateStat()
+				GLOB.UpdateStat()
+				stat(null)
+				for (var/datum/controller/subsystem/subsystem as anything in Master.subsystems)
+					subsystem.UpdateStat(time)
 
 	if(listed_turf && client)
 		if(!TurfAdjacent(listed_turf))
@@ -893,6 +875,15 @@
 	if(istype(implant,/obj/item/implant))
 		var/obj/item/implant/imp = implant
 		imp.removed()
+	if (istype(implant, /obj/item/holder/voxslug))
+		var/obj/item/holder/voxslug/holder = implant
+		var/mob/living/simple_animal/hostile/voxslug/V = holder.contents[1]
+
+		V.visible_message(SPAN_WARNING("\The [src] is momentarily stunned as it is ripped from its victim!"))
+		if (V.ai_holder)
+			var/datum/ai_holder/AI = V.ai_holder
+			AI.set_busy_delay(8 SECONDS)
+
 	. = TRUE
 
 /mob/living/silicon/robot/remove_implant(var/obj/item/implant, var/surgical_removal = FALSE)
@@ -984,7 +975,12 @@
 /mob/on_update_icon()
 	return update_icons()
 
-/mob/proc/face_direction()
+/mob/verb/face_direction()
+
+	set name = "Face Direction"
+	set category = "IC"
+	set src = usr
+
 	set_face_dir()
 
 	if(!facing_dir)
