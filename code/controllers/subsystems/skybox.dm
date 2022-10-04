@@ -17,6 +17,11 @@ SUBSYSTEM_DEF(skybox)
 /datum/controller/subsystem/skybox/PreInit()
 	build_space_appearances()
 
+
+/datum/controller/subsystem/skybox/UpdateStat(time)
+	return
+
+
 /datum/controller/subsystem/skybox/proc/build_space_appearances()
 	space_appearance_cache = new(26)
 	for (var/i in 0 to 25)
@@ -27,7 +32,6 @@ SUBSYSTEM_DEF(skybox)
 
 		var/mutable_appearance/space = new /mutable_appearance(/turf/space)
 		space.icon_state = "white"
-		space.plane = SKYBOX_PLANE	// INF нужно для того чтобы избежать белого космоса
 		space.overlays += dust
 		space_appearance_cache[i + 1] = space.appearance
 
@@ -51,7 +55,6 @@ SUBSYSTEM_DEF(skybox)
 
 /datum/controller/subsystem/skybox/proc/generate_skybox(z)
 	var/image/res = image(skybox_icon)
-	res.appearance_flags = KEEP_TOGETHER
 
 	var/image/base = overlay_image(skybox_icon, background_icon, background_color)
 
@@ -69,7 +72,7 @@ SUBSYSTEM_DEF(skybox)
 			for(var/obj/effect/overmap/visitable/other in O.loc)
 				if(other != O)
 					overmap.overlays += other.get_skybox_representation()
-			overmap.appearance_flags = RESET_COLOR
+			overmap.appearance_flags |= RESET_COLOR
 			res.overlays += overmap
 
 	for(var/datum/event/E in SSevent.active_events)
@@ -78,8 +81,8 @@ SUBSYSTEM_DEF(skybox)
 
 	return res
 
-/datum/controller/subsystem/skybox/proc/rebuild_skyboxes(list/zlevels) //inf, was: /datum/controller/subsystem/skybox/proc/rebuild_skyboxes(var/list/zlevels)
-	for(var/z in zlevels ? zlevels : skybox_cache) //inf, was:	for(var/z in zlevels)
+/datum/controller/subsystem/skybox/proc/rebuild_skyboxes(var/list/zlevels)
+	for(var/z in zlevels)
 		skybox_cache["[z]"] = generate_skybox(z)
 
 	for(var/client/C)
