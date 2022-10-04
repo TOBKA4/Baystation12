@@ -27,8 +27,12 @@ SUBSYSTEM_DEF(fluids)
 		'sound/effects/gurgle4.ogg'
 		)
 
-/datum/controller/subsystem/fluids/stat_entry()
-	..("A:[active_fluids.len] S:[water_sources.len]")
+
+/datum/controller/subsystem/fluids/UpdateStat(time)
+	if (PreventUpdateStat(time))
+		return ..()
+	..("Sources: [water_sources.len] Active Fluids: [active_fluids.len]")
+
 
 /datum/controller/subsystem/fluids/fire(resumed = 0)
 	if (!resumed)
